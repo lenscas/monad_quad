@@ -1,0 +1,8 @@
+{
+  "rust-analyzer.linkedProjects": [
+    "./sample_game/Cargo.toml",
+    "./Cargo.toml",
+    "./Cargo.toml"
+  ],
+  "cSpell.words": ["macroquad"]
+}
