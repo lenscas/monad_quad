@@ -1,6 +1,6 @@
 use macroquad::prelude::Vec2;
 
-use crate::Component;
+use crate::{components::Context, Component};
 
 pub struct LabelProperties {
     pub location: Vec2,
@@ -9,7 +9,7 @@ pub struct LabelProperties {
 
 pub struct Label;
 
-impl Component<LabelProperties> for Label {
+impl Component<&LabelProperties, &mut LabelProperties> for Label {
     type Input = ();
 
     fn instantiate(_: Self::Input) -> Self
@@ -19,11 +19,13 @@ impl Component<LabelProperties> for Label {
         Self
     }
 
-    fn process(&mut self, _: &mut LabelProperties) {}
-
-    fn render(&self, _: &LabelProperties) {}
-
-    fn ui(&mut self, ui: &mut macroquad::ui::Ui, state: &mut LabelProperties) {
-        ui.label(state.location, &state.label)
+    fn ui<'c>(
+        &mut self,
+        _: &Context,
+        ui: &mut macroquad::ui::Ui,
+        state: &'c mut LabelProperties,
+    ) -> &'c mut LabelProperties {
+        ui.label(state.location, &state.label);
+        state
     }
 }

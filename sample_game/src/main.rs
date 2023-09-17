@@ -1,5 +1,6 @@
 mod main_menu;
 mod nodes;
+mod settings;
 
 use macroquad::prelude::*;
 
@@ -13,6 +14,7 @@ use nodes::{
     CoinProperties, Coins, ControlProps, Enemies, EnemyProperties, ItemRendererProperties, Player,
     PlayerProps, ScoreDisplay, ScoreDisplayProperties,
 };
+use settings::Settings;
 
 struct MainState {
     started_game: bool,
@@ -27,12 +29,14 @@ struct MainState {
     enemy_speed: f32,
     paused: bool,
     switching: SwitchingTo,
+    settings: Settings,
 }
 impl MainState {
-    pub fn new() -> Self {
+    pub fn new_with_settings(settings: Settings) -> Self {
         MainState {
-            switching: SwitchingTo::None,
+            switching: SwitchingTo::OnScreen(main_menu::OnScreen::MainMenu),
             started_game: false,
+
             paused: false,
             player_state: PlayerProps {
                 lives: 3,
@@ -58,13 +62,24 @@ impl MainState {
             enemy_spawn_chance: 0.025,
             enemy_speed: 35.,
             enemies: Vec::new(),
+            settings,
         }
+    }
+    pub async fn new() -> Self {
+        let settings = Settings::read_from_settings_or_default().await;
+        Self::new_with_settings(settings)
+    }
+    pub fn set_settings(&mut self, settings: Settings) {
+        self.settings.apply_new_settings(settings)
     }
 }
 #[macroquad::main("Sample game")]
 async fn main() {
-    let mut state = StateFull::new_from(MainState::new());
-    let scene_tree = Viewport::new(
+    let state = MainState::new().await;
+
+    let mut state = StateFull::new_from(state);
+
+    let scene_tree = Viewport::new::<MainState>(
         vec2(1920., 1080.),
         (
             StaticValue::new(BLACK, Background),
@@ -74,17 +89,18 @@ async fn main() {
                     switching: v.switching.to_owned(),
                     selected_button: None,
                     started_game: v.started_game,
-                    ..Default::default()
+                    settings: v.settings,
                 })
                 .map_out_for(
                     |props, state| {
                         state.started_game = props.started_game;
                         state.switching = props.switching;
+                        state.set_settings(props.settings);
                     },
                     main_menu2(),
                 ),
                 Choice::new(
-                    |x: &MainState| x.player_state.lives > 0,
+                    |x| x.player_state.lives > 0,
                     (
                         Event::new(
                             |_: &MainState| is_key_pressed(KeyCode::P),
@@ -173,7 +189,8 @@ async fn main() {
                             |_: &MainState| KeyCode::Enter,
                             |v, state| {
                                 if v {
-                                    let mut new_state = MainState::new();
+                                    let mut new_state =
+                                        MainState::new_with_settings(state.settings);
                                     new_state.started_game = true;
                                     *state = new_state;
                                 }

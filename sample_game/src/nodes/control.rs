@@ -2,7 +2,7 @@ use macroquad::{
     prelude::{KeyCode, Vec2},
     time::get_frame_time,
 };
-use monad_quad::components::{events::KeyDown, Component};
+use monad_quad::components::{events::KeyDown, Component, Context};
 
 #[derive(Clone)]
 pub struct ControlProps {
@@ -14,8 +14,7 @@ pub struct ControlProps {
     pub dir: Vec2,
 }
 
-type BasicKeyDown =
-    KeyDown<ControlProps, fn(&ControlProps) -> KeyCode, fn(bool, &mut ControlProps)>;
+type BasicKeyDown = KeyDown<fn(&ControlProps) -> KeyCode, fn(bool, &mut ControlProps)>;
 
 pub struct Controls {
     left: BasicKeyDown,
@@ -23,7 +22,7 @@ pub struct Controls {
     up: BasicKeyDown,
     down: BasicKeyDown,
 }
-impl Component<ControlProps> for Controls {
+impl Component<&ControlProps, &mut ControlProps> for Controls {
     type Input = ();
 
     fn instantiate(_: Self::Input) -> Self
@@ -64,21 +63,23 @@ impl Component<ControlProps> for Controls {
         }
 
         Self {
-            left: KeyDown::new(left, left_map),
-            right: KeyDown::new(right, right_map),
-            down: KeyDown::new(down, down_map),
-            up: KeyDown::new(up, up_map),
+            left: KeyDown::new::<ControlProps>(left, left_map),
+            right: KeyDown::new::<ControlProps>(right, right_map),
+            down: KeyDown::new::<ControlProps>(down, down_map),
+            up: KeyDown::new::<ControlProps>(up, up_map),
         }
     }
 
-    fn process(&mut self, state: &mut ControlProps) {
-        self.left.process(state);
-        self.right.process(state);
-        self.up.process(state);
-        self.down.process(state);
+    fn process<'c>(
+        &mut self,
+        context: &Context,
+        state: &'c mut ControlProps,
+    ) -> &'c mut ControlProps {
+        Component::<&ControlProps, &mut ControlProps>::process(&mut self.left, context, state);
+        Component::<&ControlProps, &mut ControlProps>::process(&mut self.right, context, state);
+        Component::<&ControlProps, &mut ControlProps>::process(&mut self.up, context, state);
+        Component::<&ControlProps, &mut ControlProps>::process(&mut self.down, context, state);
         state.dir = state.dir.normalize_or_zero();
+        state
     }
-
-    fn render(&self, _: &ControlProps) {}
-    fn ui(&mut self, _: &mut macroquad::ui::Ui, _: &mut ControlProps) {}
 }

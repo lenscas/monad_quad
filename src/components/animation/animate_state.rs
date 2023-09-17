@@ -1,12 +1,10 @@
-use macroquad::time::get_frame_time;
-
-use crate::Component;
+use crate::{components::Context, Component};
 
 pub struct AnimateState<Func> {
     func: Func,
 }
 
-impl<T, Func: Fn(f32, &mut T)> Component<T> for AnimateState<Func> {
+impl<T, Func: Fn(f32, &mut T)> Component<&T, &mut T> for AnimateState<Func> {
     type Input = Func;
 
     fn instantiate(input: Self::Input) -> Self
@@ -16,12 +14,9 @@ impl<T, Func: Fn(f32, &mut T)> Component<T> for AnimateState<Func> {
         Self { func: input }
     }
 
-    fn process(&mut self, state: &mut T) {
-        let frame_time = get_frame_time();
-        (self.func)(frame_time, state)
+    fn process<'c>(&mut self, ctx: &Context, state: &'c mut T) -> &'c mut T {
+        let frame_time = ctx.get_delta();
+        (self.func)(frame_time, state);
+        state
     }
-
-    fn render(&self, _: &T) {}
-
-    fn ui(&mut self, _: &mut macroquad::ui::Ui, _: &mut T) {}
 }

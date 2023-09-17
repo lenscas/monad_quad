@@ -1,4 +1,4 @@
-use monad_quad::Component;
+use monad_quad::{components::Context, Component};
 
 use super::{main_menu_state::OnScreen, MainMenuProperties};
 
@@ -7,8 +7,10 @@ pub struct DrawScreens<MainMenu, Settings> {
     settings: Settings,
 }
 
-impl<MainMenu: Component<MainMenuProperties>, Settings: Component<MainMenuProperties>>
-    Component<MainMenuProperties> for DrawScreens<MainMenu, Settings>
+impl<
+        MainMenu: for<'a> Component<&'a MainMenuProperties, &'a mut MainMenuProperties>,
+        Settings: for<'a> Component<&'a MainMenuProperties, &'a mut MainMenuProperties>,
+    > Component<&MainMenuProperties, &mut MainMenuProperties> for DrawScreens<MainMenu, Settings>
 {
     type Input = (MainMenu, Settings);
 
@@ -22,137 +24,118 @@ impl<MainMenu: Component<MainMenuProperties>, Settings: Component<MainMenuProper
         }
     }
 
-    fn process(&mut self, state: &mut MainMenuProperties) {
-        match (&state.switching, state.on_screen) {
-            (super::SwitchingTo::None, OnScreen::MainMenu)
-            | (
-                super::SwitchingTo::Switch {
-                    from: OnScreen::MainMenu,
-                    to: OnScreen::MainMenu,
-                    ..
-                },
-                _,
-            ) => self.main_menu.process(state),
-            (super::SwitchingTo::None, OnScreen::Settings)
-            | (
-                super::SwitchingTo::Switch {
-                    from: OnScreen::Settings,
-                    to: OnScreen::Settings,
-                    ..
-                },
-                _,
-            ) => self.settings.process(state),
-            (
-                super::SwitchingTo::Switch {
-                    from: OnScreen::MainMenu,
-                    to: OnScreen::Settings,
-                    ..
-                },
-                _,
-            ) => {
-                self.main_menu.process(state);
-                self.settings.process(state)
+    fn process<'c>(
+        &mut self,
+        context: &Context,
+        state: &'c mut MainMenuProperties,
+    ) -> &'c mut MainMenuProperties {
+        match state.switching {
+            super::SwitchingTo::OnScreen(OnScreen::MainMenu)
+            | super::SwitchingTo::Switch {
+                from: OnScreen::MainMenu,
+                to: OnScreen::MainMenu,
+                ..
+            } => {
+                self.main_menu.process(context, state);
             }
-            (
-                super::SwitchingTo::Switch {
-                    from: OnScreen::Settings,
-                    to: OnScreen::MainMenu,
-                    ..
-                },
-                _,
-            ) => {
-                self.main_menu.process(state);
-                self.settings.process(state)
+            super::SwitchingTo::OnScreen(OnScreen::Settings)
+            | super::SwitchingTo::Switch {
+                from: OnScreen::Settings,
+                to: OnScreen::Settings,
+                ..
+            } => {
+                self.settings.process(context, state);
+            }
+
+            super::SwitchingTo::Switch {
+                from: OnScreen::MainMenu,
+                to: OnScreen::Settings,
+                ..
+            } => {
+                self.main_menu.process(context, state);
+                self.settings.process(context, state);
+            }
+            super::SwitchingTo::Switch {
+                from: OnScreen::Settings,
+                to: OnScreen::MainMenu,
+                ..
+            } => {
+                self.main_menu.process(context, state);
+                self.settings.process(context, state);
+            }
+        }
+        state
+    }
+
+    fn render(&self, context: &Context, props: &MainMenuProperties) {
+        match &props.switching {
+            super::SwitchingTo::OnScreen(OnScreen::MainMenu)
+            | super::SwitchingTo::Switch {
+                from: OnScreen::MainMenu,
+                to: OnScreen::MainMenu,
+                ..
+            } => self.main_menu.render(context, props),
+            super::SwitchingTo::OnScreen(OnScreen::Settings)
+            | super::SwitchingTo::Switch {
+                from: OnScreen::Settings,
+                to: OnScreen::Settings,
+                ..
+            } => self.settings.render(context, props),
+
+            super::SwitchingTo::Switch {
+                from: OnScreen::MainMenu,
+                to: OnScreen::Settings,
+                ..
+            } => {
+                self.main_menu.render(context, props);
+                self.settings.render(context, props)
+            }
+            super::SwitchingTo::Switch {
+                from: OnScreen::Settings,
+                to: OnScreen::MainMenu,
+                ..
+            } => {
+                self.main_menu.render(context, props);
+                self.settings.render(context, props)
             }
         }
     }
 
-    fn render(&self, props: &MainMenuProperties) {
-        match (&props.switching, props.on_screen) {
-            (super::SwitchingTo::None, OnScreen::MainMenu)
-            | (
-                super::SwitchingTo::Switch {
-                    from: OnScreen::MainMenu,
-                    to: OnScreen::MainMenu,
-                    ..
-                },
-                _,
-            ) => self.main_menu.render(props),
-            (super::SwitchingTo::None, OnScreen::Settings)
-            | (
-                super::SwitchingTo::Switch {
-                    from: OnScreen::Settings,
-                    to: OnScreen::Settings,
-                    ..
-                },
-                _,
-            ) => self.settings.render(props),
-            (
-                super::SwitchingTo::Switch {
-                    from: OnScreen::MainMenu,
-                    to: OnScreen::Settings,
-                    ..
-                },
-                _,
-            ) => {
-                self.main_menu.render(props);
-                self.settings.render(props)
-            }
-            (
-                super::SwitchingTo::Switch {
-                    from: OnScreen::Settings,
-                    to: OnScreen::MainMenu,
-                    ..
-                },
-                _,
-            ) => {
-                self.main_menu.render(props);
-                self.settings.render(props)
-            }
-        }
-    }
+    fn ui<'c>(
+        &mut self,
+        context: &Context,
+        ui: &mut macroquad::ui::Ui,
+        state: &'c mut MainMenuProperties,
+    ) -> &'c mut MainMenuProperties {
+        match state.switching {
+            super::SwitchingTo::OnScreen(OnScreen::MainMenu)
+            | super::SwitchingTo::Switch {
+                from: OnScreen::MainMenu,
+                to: OnScreen::MainMenu,
+                ..
+            } => self.main_menu.ui(context, ui, state),
+            super::SwitchingTo::OnScreen(OnScreen::Settings)
+            | super::SwitchingTo::Switch {
+                from: OnScreen::Settings,
+                to: OnScreen::Settings,
+                ..
+            } => self.settings.ui(context, ui, state),
 
-    fn ui(&mut self, ui: &mut macroquad::ui::Ui, state: &mut MainMenuProperties) {
-        match (&state.switching, state.on_screen) {
-            (super::SwitchingTo::None, OnScreen::MainMenu)
-            | (
-                super::SwitchingTo::Switch {
-                    from: OnScreen::MainMenu,
-                    to: OnScreen::MainMenu,
-                    ..
-                },
-                _,
-            ) => self.main_menu.ui(ui, state),
-            (super::SwitchingTo::None, OnScreen::Settings)
-            | (
-                super::SwitchingTo::Switch {
-                    from: OnScreen::Settings,
-                    to: OnScreen::Settings,
-                    ..
-                },
-                _,
-            ) => self.settings.ui(ui, state),
-            (
-                super::SwitchingTo::Switch {
-                    from: OnScreen::MainMenu,
-                    to: OnScreen::Settings,
-                    ..
-                },
-                _,
-            ) => {
-                self.main_menu.ui(ui, state);
-                self.settings.ui(ui, state)
+            super::SwitchingTo::Switch {
+                from: OnScreen::MainMenu,
+                to: OnScreen::Settings,
+                ..
+            } => {
+                self.main_menu.ui(context, ui, state);
+                self.settings.ui(context, ui, state)
             }
-            (
-                super::SwitchingTo::Switch {
-                    from: OnScreen::Settings,
-                    to: OnScreen::MainMenu,
-                    ..
-                },
-                _,
-            ) => {
-                self.main_menu.ui(ui, state);
-                self.settings.ui(ui, state)
+            super::SwitchingTo::Switch {
+                from: OnScreen::Settings,
+                to: OnScreen::MainMenu,
+                ..
+            } => {
+                self.main_menu.ui(context, ui, state);
+                self.settings.ui(context, ui, state)
             }
         }
     }

@@ -5,7 +5,7 @@ use macroquad::{
     ui::{widgets, UiContent},
 };
 
-use crate::Component;
+use crate::{components::Context, Component};
 
 pub struct ButtonProperties<'a, T> {
     pub size: Vec2,
@@ -30,8 +30,8 @@ pub struct Button<OnClick> {
     on_click: OnClick,
 }
 
-impl<'a, T, OnClick: Fn(&mut ButtonProperties<'a, T>)> Component<ButtonProperties<'a, T>>
-    for Button<OnClick>
+impl<'a, T, OnClick: Fn(&mut ButtonProperties<'a, T>)>
+    Component<&ButtonProperties<'a, T>, &mut ButtonProperties<'a, T>> for Button<OnClick>
 {
     type Input = OnClick;
 
@@ -42,12 +42,13 @@ impl<'a, T, OnClick: Fn(&mut ButtonProperties<'a, T>)> Component<ButtonPropertie
         Self { on_click }
     }
 
-    fn process(&mut self, _: &mut ButtonProperties<'a, T>) {}
-
-    fn render(&self, _: &ButtonProperties<'a, T>) {}
-
-    fn ui(&mut self, ui: &mut macroquad::ui::Ui, state: &mut ButtonProperties<'a, T>) {
-        let x = match &state.content {
+    fn ui<'c>(
+        &mut self,
+        _: &Context,
+        ui: &mut macroquad::ui::Ui,
+        state: &'c mut ButtonProperties<'a, T>,
+    ) -> &'c mut ButtonProperties<'a, T> {
+        let x = match &mut state.content {
             UiContent::Label(x) => UiContent::Label(std::borrow::Cow::Borrowed(x)),
             UiContent::Texture(x) => UiContent::Texture(x.clone()),
         };
@@ -59,5 +60,6 @@ impl<'a, T, OnClick: Fn(&mut ButtonProperties<'a, T>)> Component<ButtonPropertie
         if x {
             (self.on_click)(state);
         }
+        state
     }
 }

@@ -1,6 +1,10 @@
-use macroquad::{ui::root_ui, window::next_frame};
+use macroquad::{
+    prelude::vec2,
+    ui::root_ui,
+    window::{next_frame, screen_height, screen_width},
+};
 
-use crate::Component;
+use crate::{components::Context, Component};
 
 /// This manages the state and controls the game loop
 pub struct StateFull<T> {
@@ -12,13 +16,23 @@ impl<T> StateFull<T> {
         Self { state }
     }
     /// starts the game loop
-    pub async fn render<Comp: Component<T>>(&mut self, mut component: Comp) {
+    pub async fn render<'b, Comp: for<'a> Component<&'a T, &'a mut T>>(
+        &'b mut self,
+        mut component: Comp,
+    ) {
+        let mut state = &mut self.state;
         loop {
-            component.render(&self.state);
-            component.process(&mut self.state);
+            let context = Context::new(vec2(screen_width(), screen_height()));
+            {
+                state = component.process(&context, state);
+            }
+            {
+                component.render(&context, state);
+            }
+
             {
                 let mut ui = root_ui();
-                component.ui(&mut ui, &mut self.state);
+                state = component.ui(&context, &mut ui, state);
             }
 
             next_frame().await

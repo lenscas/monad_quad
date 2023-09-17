@@ -1,45 +1,57 @@
-use std::marker::PhantomData;
+use crate::{components::Context, Component};
 
-use crate::Component;
-
-pub struct OnlyRenderOn<State, Child: Component<State>, Decider: Fn(&State) -> bool> {
-    _state: PhantomData<State>,
+pub struct OnlyRenderOn<Child, Decider> {
     child: Child,
     decider: Decider,
 }
-impl<State, Child: Component<State>, Decider: Fn(&State) -> bool>
-    OnlyRenderOn<State, Child, Decider>
-{
-    pub fn new(child: Child, decider: Decider) -> Self {
-        Self {
-            _state: PhantomData,
-            child,
-            decider,
-        }
+impl<Child, Decider> OnlyRenderOn<Child, Decider> {
+    pub fn new<State>(child: Child, decider: Decider) -> Self
+    where
+        Child: for<'a> Component<&'a State, &'a mut State>,
+        Decider: Fn(&State) -> bool,
+    {
+        Self { child, decider }
     }
-    pub fn process(&mut self, state: &mut State) -> bool {
+    pub fn process<State>(&mut self, context: &Context, state: &mut State) -> bool
+    where
+        Child: for<'a> Component<&'a State, &'a mut State>,
+        Decider: Fn(&State) -> bool,
+    {
         if self.should_process(state) {
-            self.child.process(state);
+            self.child.process(context, state);
             true
         } else {
             false
         }
     }
-    pub fn ui(&mut self, ui: &mut macroquad::ui::Ui, state: &mut State) -> bool {
+    pub fn ui<'a, State>(
+        &mut self,
+        context: &Context,
+        ui: &mut macroquad::ui::Ui,
+        state: &'a mut State,
+    ) -> bool
+    where
+        Child: Component<&'a State, &'a mut State>,
+        Decider: Fn(&State) -> bool,
+    {
         if self.should_process(state) {
-            self.child.ui(ui, state);
+            self.child.ui(context, ui, state);
             true
         } else {
             false
         }
     }
-    pub fn should_process(&self, state: &State) -> bool {
+    pub fn should_process<'a, 'b: 'a, State: 'b>(&self, state: &State) -> bool
+    where
+        Child: Component<&'a State, &'a mut State>,
+        Decider: Fn(&State) -> bool,
+    {
         (self.decider)(state)
     }
 }
 
-impl<State, Child: Component<State>, Decider: Fn(&State) -> bool> Component<State>
-    for OnlyRenderOn<State, Child, Decider>
+impl<State, Child: for<'a> Component<&'a State, &'a mut State>, Decider: Fn(&State) -> bool>
+    Component<&State, &mut State> for OnlyRenderOn<Child, Decider>
 {
     type Input = (Child, Decider);
 
@@ -50,35 +62,36 @@ impl<State, Child: Component<State>, Decider: Fn(&State) -> bool> Component<Stat
         Self::new(child, decider)
     }
 
-    fn process(&mut self, state: &mut State) {
-        self.process(state);
+    fn process<'c>(&mut self, context: &Context, state: &'c mut State) -> &'c mut State {
+        self.process(context, state);
+        state
     }
 
-    fn render(&self, props: &State) {
-        self.child.render(props)
+    fn render(&self, context: &Context, props: &State) {
+        self.child.render(context, props)
     }
-    fn ui(&mut self, ui: &mut macroquad::ui::Ui, state: &mut State) {
-        self.ui(ui, state);
+    fn ui<'c>(
+        &mut self,
+        context: &Context,
+        ui: &mut macroquad::ui::Ui,
+        state: &'c mut State,
+    ) -> &'c mut State {
+        self.ui(context, ui, state);
+        state
     }
 }
 
-pub struct OnlyRenderWith<
-    State,
-    Child: Component<State>,
-    Decider: Fn(&State) -> bool,
-    OnPausedChild: Component<State>,
-> {
-    child: OnlyRenderOn<State, Child, Decider>,
+pub struct OnlyRenderWith<Child, Decider, OnPausedChild> {
+    child: OnlyRenderOn<Child, Decider>,
     on_paused_child: OnPausedChild,
 }
-impl<
-        State,
-        Child: Component<State>,
+impl<Child, Decider, OnPausedChild> OnlyRenderWith<Child, Decider, OnPausedChild> {
+    pub fn new<State>(decider: Decider, child: Child, on_paused_child: OnPausedChild) -> Self
+    where
+        Child: for<'a> Component<&'a State, &'a mut State>,
         Decider: Fn(&State) -> bool,
-        OnPausedChild: Component<State>,
-    > OnlyRenderWith<State, Child, Decider, OnPausedChild>
-{
-    pub fn new(decider: Decider, child: Child, on_paused_child: OnPausedChild) -> Self {
+        OnPausedChild: for<'a> Component<&'a State, &'a mut State>,
+    {
         Self {
             child: OnlyRenderOn::new(child, decider),
             on_paused_child,
@@ -88,10 +101,10 @@ impl<
 
 impl<
         State,
-        Child: Component<State>,
+        Child: for<'a> Component<&'a State, &'a mut State>,
         Decider: Fn(&State) -> bool,
-        OnPausedChild: Component<State>,
-    > Component<State> for OnlyRenderWith<State, Child, Decider, OnPausedChild>
+        OnPausedChild: for<'a> Component<&'a State, &'a mut State>,
+    > Component<&State, &mut State> for OnlyRenderWith<Child, Decider, OnPausedChild>
 {
     type Input = (Decider, Child, OnPausedChild);
 
@@ -102,23 +115,30 @@ impl<
         Self::new(decider, child, paused_child)
     }
 
-    fn process(&mut self, state: &mut State) {
-        if !self.child.process(state) {
-            self.on_paused_child.process(state)
+    fn process<'c>(&mut self, context: &Context, state: &'c mut State) -> &'c mut State {
+        if !self.child.process(context, state) {
+            self.on_paused_child.process(context, state);
         }
+        state
     }
 
-    fn render(&self, props: &State) {
-        self.child.render(props);
+    fn render(&self, context: &Context, props: &State) {
+        self.child.render(context, props);
         if !self.child.should_process(props) {
-            self.on_paused_child.render(props)
+            self.on_paused_child.render(context, props)
         }
     }
 
-    fn ui(&mut self, ui: &mut macroquad::ui::Ui, state: &mut State) {
-        self.child.ui(ui, state);
+    fn ui<'c>(
+        &mut self,
+        context: &Context,
+        ui: &mut macroquad::ui::Ui,
+        state: &'c mut State,
+    ) -> &'c mut State {
+        self.child.ui(context, ui, state);
         if !self.child.should_process(state) {
-            self.on_paused_child.ui(ui, state)
+            self.on_paused_child.ui(context, ui, state);
         }
+        state
     }
 }

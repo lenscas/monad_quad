@@ -1,6 +1,6 @@
 use macroquad::hash;
 
-use crate::Component;
+use crate::{components::Context, Component};
 
 pub struct CheckboxProperties {
     pub state: bool,
@@ -8,7 +8,7 @@ pub struct CheckboxProperties {
 }
 pub struct CheckBox;
 
-impl Component<CheckboxProperties> for CheckBox {
+impl Component<&CheckboxProperties, &mut CheckboxProperties> for CheckBox {
     type Input = ();
 
     fn instantiate(_: Self::Input) -> Self
@@ -18,11 +18,13 @@ impl Component<CheckboxProperties> for CheckBox {
         Self
     }
 
-    fn process(&mut self, _: &mut CheckboxProperties) {}
-
-    fn render(&self, _: &CheckboxProperties) {}
-
-    fn ui(&mut self, ui: &mut macroquad::ui::Ui, state: &mut CheckboxProperties) {
-        ui.checkbox(hash!(), &state.label, &mut state.state)
+    fn ui<'c>(
+        &mut self,
+        _: &Context,
+        ui: &mut macroquad::ui::Ui,
+        state: &'c mut CheckboxProperties,
+    ) -> &'c mut CheckboxProperties {
+        ui.checkbox(hash!(), &state.label, &mut state.state);
+        state
     }
 }

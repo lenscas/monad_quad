@@ -4,7 +4,7 @@ use macroquad::{
     window::{clear_background, screen_height, screen_width},
 };
 
-use crate::Component;
+use crate::{components::Context, Component};
 
 pub struct Viewport<Child> {
     child: Child,
@@ -21,14 +21,17 @@ pub struct ScreenSizeConfig<Child> {
 impl<Child> Viewport<Child> {
     pub fn new<T>(size: Vec2, child: Child) -> Self
     where
-        Child: Component<T>,
+        Child: for<'a> Component<&'a T, &'a mut T>,
         Self: Sized,
     {
         Self::instantiate(ScreenSizeConfig { child, size })
     }
+    fn create_context(&self) -> Context {
+        Context::new(self.size)
+    }
 }
 
-impl<T, Child: Component<T>> Component<T> for Viewport<Child> {
+impl<T: Clone, X, Child: Component<T, X>> Component<T, X> for Viewport<Child> {
     type Input = ScreenSizeConfig<Child>;
 
     fn instantiate(input: Self::Input) -> Self
@@ -50,14 +53,16 @@ impl<T, Child: Component<T>> Component<T> for Viewport<Child> {
         }
     }
 
-    fn process(&mut self, state: &mut T) {
-        self.child.process(state);
+    fn process(&mut self, _: &Context, state: X) -> X {
+        let context = self.create_context();
+        self.child.process(&context, state)
     }
 
-    fn render(&self, props: &T) {
+    fn render(&self, _: &Context, props: T) {
+        let context = self.create_context();
         let scale = f32::min(screen_width() / self.size.x, screen_height() / self.size.y);
         set_camera(&self.camera);
-        self.child.render(props);
+        self.child.render(&context, props);
         set_default_camera();
         clear_background(BLACK);
         draw_texture_ex(
@@ -73,11 +78,12 @@ impl<T, Child: Component<T>> Component<T> for Viewport<Child> {
         )
     }
 
-    fn ui(&mut self, ui: &mut macroquad::ui::Ui, state: &mut T) {
+    fn ui(&mut self, _: &Context, ui: &mut macroquad::ui::Ui, state: X) -> X {
         //self.child.ui(ui, state)
+        let context = self.create_context();
         let scale = f32::min(screen_width() / self.size.x, screen_height() / self.size.y);
         set_camera(&self.camera);
-        self.child.ui(ui, state);
+        let state = self.child.ui(&context, ui, state);
         set_default_camera();
         clear_background(BLACK);
         draw_texture_ex(
@@ -90,6 +96,7 @@ impl<T, Child: Component<T>> Component<T> for Viewport<Child> {
                 flip_y: true, // Must flip y otherwise 'render_target' will be upside down
                 ..Default::default()
             },
-        )
+        );
+        state
     }
 }

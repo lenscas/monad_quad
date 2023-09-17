@@ -1,9 +1,6 @@
-use macroquad::{
-    prelude::{Color, Vec2},
-    shapes::draw_rectangle,
-};
+use macroquad::prelude::{Color, Vec2};
 
-use crate::Component;
+use crate::{components::Context, Component};
 
 /// Properties to render a Rectangle
 
@@ -29,13 +26,9 @@ impl Default for Rectangle {
     }
 }
 
-impl Component<RectangleProps> for Rectangle {
-    fn process(&mut self, _: &mut RectangleProps) {
-        //let mut mapped = (self.func)(state);
-    }
-
-    fn render(&self, props: &RectangleProps) {
-        draw_rectangle(
+impl Component<&RectangleProps, &mut RectangleProps> for Rectangle {
+    fn render(&self, context: &Context, props: &RectangleProps) {
+        context.draw_rectangle(
             props.location.x,
             props.location.y,
             props.size.x,
@@ -49,5 +42,4 @@ impl Component<RectangleProps> for Rectangle {
     fn instantiate(_: Self::Input) -> Self {
         Self::new()
     }
-    fn ui(&mut self, _: &mut macroquad::ui::Ui, _: &mut RectangleProps) {}
 }

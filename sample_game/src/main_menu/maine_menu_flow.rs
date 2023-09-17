@@ -4,26 +4,17 @@ use macroquad::{
 };
 use monad_quad::components::ui::{ButtonProperties, WindowProperties};
 
-use super::{main_menu_state::MainMenuButtonSelected, MainMenuProperties, OnScreen, SwitchingTo};
+use super::{
+    main_menu_state::MainMenuButtonSelected,
+    settings_menu::{self, SettingsMenuProperties},
+    MainMenuProperties, OnScreen, SwitchingTo,
+};
 
 impl MainMenuProperties {
     pub fn to_top_window_state(&self) -> WindowProperties<MainMenuProperties> {
-        let progress = match self.switching {
-            SwitchingTo::Switch {
-                from: OnScreen::MainMenu,
-                full_progress,
-                ..
-            } => full_progress,
-            SwitchingTo::Switch {
-                from: OnScreen::Settings,
-                full_progress,
-                ..
-            } => -full_progress,
-            _ => 0.,
-        };
-        let loc = progress * screen_width();
+        let loc = self.switching.get_location_of_window(OnScreen::MainMenu);
         WindowProperties {
-            location: vec2(loc, 0.),
+            location: loc,
             size: vec2(screen_width(), screen_height()),
             label: Some("Monad Quad SAMPLE!".into()),
             title_bar: true,
@@ -67,5 +58,16 @@ impl MainMenuProperties {
     }
     pub fn merge_to_settings_menu_button(from: ButtonProperties<SwitchingTo>, me: &mut Self) {
         me.switching = from.extra_data;
+    }
+    pub fn to_settings_menu_properties(&self) -> settings_menu::SettingsMenuProperties {
+        SettingsMenuProperties {
+            settings: self.settings,
+            switch: self.switching.to_owned(),
+            has_back_button_selected: false,
+        }
+    }
+    pub fn merge_from_settings_menu_properties(settings: SettingsMenuProperties, me: &mut Self) {
+        me.settings = settings.settings;
+        me.switching = settings.switch;
     }
 }

@@ -1,6 +1,6 @@
 use macroquad::hash;
 
-use crate::Component;
+use crate::{components::Context, Component};
 
 pub struct InputProperties {
     pub is_password: bool,
@@ -9,7 +9,7 @@ pub struct InputProperties {
 }
 
 pub struct Input;
-impl Component<InputProperties> for Input {
+impl Component<&InputProperties, &mut InputProperties> for Input {
     type Input = ();
 
     fn instantiate((): Self::Input) -> Self
@@ -19,15 +19,17 @@ impl Component<InputProperties> for Input {
         Self
     }
 
-    fn process(&mut self, _: &mut InputProperties) {}
-
-    fn render(&self, _: &InputProperties) {}
-
-    fn ui(&mut self, ui: &mut macroquad::ui::Ui, state: &mut InputProperties) {
+    fn ui<'c>(
+        &mut self,
+        _: &Context,
+        ui: &mut macroquad::ui::Ui,
+        state: &'c mut InputProperties,
+    ) -> &'c mut InputProperties {
         if state.is_password {
             ui.input_password(hash!(), &state.label, &mut state.data)
         } else {
             ui.input_text(hash!(), &state.label, &mut state.data)
         }
+        state
     }
 }

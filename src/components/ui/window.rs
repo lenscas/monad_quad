@@ -1,6 +1,7 @@
+use context::Context;
 use macroquad::{prelude::Vec2, ui::widgets};
 
-use crate::Component;
+use crate::{components::context, Component};
 
 #[derive(Clone, Debug)]
 pub struct WindowProperties<T> {
@@ -22,13 +23,15 @@ impl<Child> Window<Child> {
     pub fn new<T>(id: u64, child: Child) -> Self
     where
         Self: Sized,
-        Child: Component<T>,
+        Child: for<'z> Component<&'z T, &'z mut T>,
     {
         Self::instantiate((id, child))
     }
 }
 
-impl<T, Child: Component<T>> Component<WindowProperties<T>> for Window<Child> {
+impl<T, Child: for<'z> Component<&'z T, &'z mut T>>
+    Component<&WindowProperties<T>, &mut WindowProperties<T>> for Window<Child>
+{
     type Input = (u64, Child);
 
     fn instantiate((id, child): Self::Input) -> Self
@@ -38,11 +41,12 @@ impl<T, Child: Component<T>> Component<WindowProperties<T>> for Window<Child> {
         Self { child, id }
     }
 
-    fn process(&mut self, _: &mut WindowProperties<T>) {}
-
-    fn render(&self, _: &WindowProperties<T>) {}
-
-    fn ui(&mut self, ui: &mut macroquad::ui::Ui, state: &mut WindowProperties<T>) {
+    fn ui<'c>(
+        &mut self,
+        context: &Context,
+        ui: &mut macroquad::ui::Ui,
+        state: &'c mut WindowProperties<T>,
+    ) -> &'c mut WindowProperties<T> {
         let mut window = widgets::Window::new(self.id, state.location, state.size)
             .titlebar(state.title_bar)
             .movable(state.moveable)
@@ -50,6 +54,10 @@ impl<T, Child: Component<T>> Component<WindowProperties<T>> for Window<Child> {
         if let Some(label) = &state.label {
             window = window.label(label);
         }
-        window.ui(ui, |ui| self.child.ui(ui, &mut state.extra_data));
+
+        window.ui(ui, |ui| {
+            self.child.ui(context, ui, &mut state.extra_data);
+        });
+        state
     }
 }

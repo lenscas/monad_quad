@@ -2,7 +2,7 @@ use crate::Component;
 
 pub struct Never;
 
-impl<T> Component<T> for Never {
+impl<T: Clone, X> Component<T, X> for Never {
     type Input = ();
 
     fn instantiate(_: Self::Input) -> Self
@@ -11,10 +11,4 @@ impl<T> Component<T> for Never {
     {
         Self
     }
-
-    fn process(&mut self, _: &mut T) {}
-
-    fn render(&self, _: &T) {}
-
-    fn ui(&mut self, _: &mut macroquad::ui::Ui, _: &mut T) {}
 }

@@ -3,13 +3,11 @@ use std::marker::PhantomData;
 use macroquad::{
     prelude::{vec2, Rect, Vec2, YELLOW},
     rand::RandomRange,
-    time::get_frame_time,
-    window::{screen_height, screen_width},
 };
 use monad_quad::components::{
     events::VariableTimer,
     render::{Rectangle, RectangleProps},
-    Component,
+    Component, Context,
 };
 
 pub struct SpawnerConfig<ExtraData, T> {
@@ -19,17 +17,14 @@ pub struct SpawnerConfig<ExtraData, T> {
     pub spawned_items: Vec<T>,
 }
 
-type ChildTimer<ExtraData, Item, Spawn> = VariableTimer<
-    SpawnerConfig<ExtraData, Item>,
-    fn(&SpawnerConfig<ExtraData, Item>) -> f32,
-    Spawn,
->;
+type ChildTimer<ExtraData, Item, Spawn> =
+    VariableTimer<fn(&SpawnerConfig<ExtraData, Item>) -> f32, Spawn>;
 
-pub struct Spawner<Item, ExtraData, Spawn: Fn(&mut SpawnerConfig<ExtraData, Item>)> {
+pub struct Spawner<Item, ExtraData, Spawn: Fn(&Context, &mut SpawnerConfig<ExtraData, Item>)> {
     timer: ChildTimer<ExtraData, Item, Spawn>,
     _spawner: PhantomData<Spawn>,
 }
-impl<Item, ExtraData, Spawn: Fn(&mut SpawnerConfig<ExtraData, Item>)>
+impl<Item, ExtraData, Spawn: Fn(&Context, &mut SpawnerConfig<ExtraData, Item>)>
     Spawner<Item, ExtraData, Spawn>
 {
     pub fn new(spawn: Spawn) -> Self {
@@ -37,8 +32,9 @@ impl<Item, ExtraData, Spawn: Fn(&mut SpawnerConfig<ExtraData, Item>)>
     }
 }
 
-impl<Item, ExtraData, Spawn: Fn(&mut SpawnerConfig<ExtraData, Item>)>
-    Component<SpawnerConfig<ExtraData, Item>> for Spawner<Item, ExtraData, Spawn>
+impl<Item, ExtraData, Spawn: Fn(&Context, &mut SpawnerConfig<ExtraData, Item>)>
+    Component<&SpawnerConfig<ExtraData, Item>, &mut SpawnerConfig<ExtraData, Item>>
+    for Spawner<Item, ExtraData, Spawn>
 {
     type Input = Spawn;
 
@@ -55,15 +51,35 @@ impl<Item, ExtraData, Spawn: Fn(&mut SpawnerConfig<ExtraData, Item>)>
         }
     }
 
-    fn process(&mut self, state: &mut SpawnerConfig<ExtraData, Item>) {
-        self.timer.process(state)
+    fn process<'c>(
+        &mut self,
+        context: &Context,
+        state: &'c mut SpawnerConfig<ExtraData, Item>,
+    ) -> &'c mut SpawnerConfig<ExtraData, Item> {
+        Component::<(), &mut SpawnerConfig<ExtraData, Item>>::process(
+            &mut self.timer,
+            context,
+            state,
+        );
+        state
     }
 
-    fn render(&self, props: &SpawnerConfig<ExtraData, Item>) {
-        self.timer.render(props)
+    fn render(&self, context: &Context, props: &SpawnerConfig<ExtraData, Item>) {
+        self.timer.render(context, props)
     }
-    fn ui(&mut self, ui: &mut macroquad::ui::Ui, state: &mut SpawnerConfig<ExtraData, Item>) {
-        self.timer.ui(ui, state)
+    fn ui<'c>(
+        &mut self,
+        context: &Context,
+        ui: &mut macroquad::ui::Ui,
+        state: &'c mut SpawnerConfig<ExtraData, Item>,
+    ) -> &'c mut SpawnerConfig<ExtraData, Item> {
+        Component::<(), &mut SpawnerConfig<ExtraData, Item>>::ui(
+            &mut self.timer,
+            context,
+            ui,
+            state,
+        );
+        state
     }
 }
 
@@ -78,13 +94,19 @@ pub struct ChildProperties<T> {
     pub destroyed: bool,
 }
 
-pub struct ItemRenderer<ExtraData: Clone, Child: Component<ChildProperties<ExtraData>>> {
+pub struct ItemRenderer<
+    ExtraData: Clone,
+    Child: for<'a> Component<&'a ChildProperties<ExtraData>, &'a mut ChildProperties<ExtraData>>,
+> {
     _extra_data: PhantomData<ExtraData>,
     child: Child,
 }
 
-impl<ExtraData: Clone, Child: Component<ChildProperties<ExtraData>>>
-    Component<ItemRendererProperties<ExtraData>> for ItemRenderer<ExtraData, Child>
+impl<
+        ExtraData: Clone,
+        Child: for<'a> Component<&'a ChildProperties<ExtraData>, &'a mut ChildProperties<ExtraData>>,
+    > Component<&ItemRendererProperties<ExtraData>, &mut ItemRendererProperties<ExtraData>>
+    for ItemRenderer<ExtraData, Child>
 {
     type Input = Child;
 
@@ -98,7 +120,11 @@ impl<ExtraData: Clone, Child: Component<ChildProperties<ExtraData>>>
         }
     }
 
-    fn process(&mut self, state: &mut ItemRendererProperties<ExtraData>) {
+    fn process<'c>(
+        &mut self,
+        context: &Context,
+        state: &'c mut ItemRendererProperties<ExtraData>,
+    ) -> &'c mut ItemRendererProperties<ExtraData> {
         state.items = state
             .items
             .drain(0..)
@@ -108,7 +134,7 @@ impl<ExtraData: Clone, Child: Component<ChildProperties<ExtraData>>>
                     extra_data: state.extra_data.to_owned(),
                     location: v,
                 };
-                self.child.process(&mut child_state);
+                self.child.process(context, &mut child_state);
                 state.extra_data = child_state.extra_data;
                 v = child_state.location;
                 if child_state.destroyed {
@@ -117,28 +143,35 @@ impl<ExtraData: Clone, Child: Component<ChildProperties<ExtraData>>>
                     Some(v)
                 }
             })
-            .collect()
+            .collect();
+        state
     }
 
-    fn render(&self, props: &ItemRendererProperties<ExtraData>) {
+    fn render(&self, context: &Context, props: &ItemRendererProperties<ExtraData>) {
         for v in &props.items {
             let child_state = ChildProperties {
                 destroyed: false,
                 extra_data: props.extra_data.to_owned(),
                 location: *v,
             };
-            self.child.render(&child_state);
+            self.child.render(context, &child_state);
         }
     }
-    fn ui(&mut self, ui: &mut macroquad::ui::Ui, state: &mut ItemRendererProperties<ExtraData>) {
-        for v in &state.items {
+    fn ui<'c>(
+        &mut self,
+        context: &Context,
+        ui: &mut macroquad::ui::Ui,
+        state: &'c mut ItemRendererProperties<ExtraData>,
+    ) -> &'c mut ItemRendererProperties<ExtraData> {
+        for v in &mut state.items {
             let mut child_state = ChildProperties {
                 destroyed: false,
                 extra_data: state.extra_data.to_owned(),
                 location: *v,
             };
-            self.child.ui(ui, &mut child_state);
+            self.child.ui(context, ui, &mut child_state);
         }
+        state
     }
 }
 
@@ -156,7 +189,9 @@ pub struct CoinProperties {
 pub struct SingleCoinRenderer {
     renderer: Rectangle,
 }
-impl Component<ChildProperties<CoinProperties>> for SingleCoinRenderer {
+impl Component<&ChildProperties<CoinProperties>, &mut ChildProperties<CoinProperties>>
+    for SingleCoinRenderer
+{
     type Input = ();
 
     fn instantiate(_: Self::Input) -> Self
@@ -168,10 +203,14 @@ impl Component<ChildProperties<CoinProperties>> for SingleCoinRenderer {
         }
     }
 
-    fn process(&mut self, state: &mut ChildProperties<CoinProperties>) {
+    fn process<'c>(
+        &mut self,
+        context: &Context,
+        state: &'c mut ChildProperties<CoinProperties>,
+    ) -> &'c mut ChildProperties<CoinProperties> {
         let mut coin_loc = state.location;
-        let frame_time = get_frame_time();
-        let window_height = screen_height();
+        let frame_time = context.get_delta();
+        let window_height = context.viewport_size().y;
         let player_rec = Rect::new(
             state.extra_data.player_loc.x,
             state.extra_data.player_loc.y,
@@ -193,44 +232,58 @@ impl Component<ChildProperties<CoinProperties>> for SingleCoinRenderer {
             state.extra_data.coins_let_through += 1;
             state.destroyed = true;
         }
+        state
     }
 
-    fn render(&self, props: &ChildProperties<CoinProperties>) {
-        self.renderer.render(&RectangleProps {
-            size: vec2(props.extra_data.coin_size, props.extra_data.coin_size),
-            color: YELLOW,
-            location: props.location,
-        })
+    fn render(&self, context: &Context, props: &ChildProperties<CoinProperties>) {
+        self.renderer.render(
+            context,
+            &RectangleProps {
+                size: vec2(props.extra_data.coin_size, props.extra_data.coin_size),
+                color: YELLOW,
+                location: props.location,
+            },
+        )
     }
-    fn ui(&mut self, ui: &mut macroquad::ui::Ui, state: &mut ChildProperties<CoinProperties>) {
+    fn ui<'c>(
+        &mut self,
+        context: &Context,
+        ui: &mut macroquad::ui::Ui,
+        state: &'c mut ChildProperties<CoinProperties>,
+    ) -> &'c mut ChildProperties<CoinProperties> {
         self.renderer.ui(
+            context,
             ui,
             &mut RectangleProps {
                 size: vec2(state.extra_data.coin_size, state.extra_data.coin_size),
                 color: YELLOW,
                 location: state.location,
             },
-        )
+        );
+        state
     }
 }
 
-type CoinSpawner = Spawner<Vec2, CoinProperties, fn(&mut SpawnerConfig<CoinProperties, Vec2>)>;
+type CoinSpawner =
+    Spawner<Vec2, CoinProperties, fn(&Context, &mut SpawnerConfig<CoinProperties, Vec2>)>;
 
 pub struct Coins {
     spawner: CoinSpawner,
     renderer: ItemRenderer<CoinProperties, SingleCoinRenderer>,
 }
-impl Component<ItemRendererProperties<CoinProperties>> for Coins {
+impl Component<&ItemRendererProperties<CoinProperties>, &mut ItemRendererProperties<CoinProperties>>
+    for Coins
+{
     type Input = ();
 
     fn instantiate(_: Self::Input) -> Self
     where
         Self: Sized,
     {
-        fn on_reached_time(props: &mut SpawnerConfig<CoinProperties, Vec2>) {
+        fn on_reached_time(context: &Context, props: &mut SpawnerConfig<CoinProperties, Vec2>) {
             if f32::gen_range(0., 1.) < props.extra_data.spawn_chance {
                 props.spawned_items.push(vec2(
-                    f32::gen_range(0., screen_width() - props.extra_data.coin_size),
+                    f32::gen_range(0., context.viewport_size().x - props.extra_data.coin_size),
                     0., //f32::gen_range(0., screen_height() - state.coin_size),
                 ))
             }
@@ -246,42 +299,49 @@ impl Component<ItemRendererProperties<CoinProperties>> for Coins {
         }
     }
 
-    fn process(&mut self, state: &mut ItemRendererProperties<CoinProperties>) {
+    fn process<'c>(
+        &mut self,
+        context: &Context,
+        state: &'c mut ItemRendererProperties<CoinProperties>,
+    ) -> &'c mut ItemRendererProperties<CoinProperties> {
         let mut spawner_config = SpawnerConfig {
             max_time: 1.0 / 60.,
             size: vec2(state.extra_data.coin_size, state.extra_data.coin_size),
             extra_data: state.extra_data.to_owned(),
             spawned_items: state.items.to_owned(),
         };
-        self.spawner.process(&mut spawner_config);
+        self.spawner.process(context, &mut spawner_config);
         state.extra_data = spawner_config.extra_data;
         state.items = spawner_config.spawned_items;
-        self.renderer.process(state);
+        self.renderer.process(context, state);
+        state
     }
 
-    fn render(&self, props: &ItemRendererProperties<CoinProperties>) {
+    fn render(&self, context: &Context, props: &ItemRendererProperties<CoinProperties>) {
         let spawner_config = SpawnerConfig {
             max_time: 1.0 / 60.,
             size: vec2(props.extra_data.coin_size, props.extra_data.coin_size),
             extra_data: props.extra_data.to_owned(),
             spawned_items: props.items.to_owned(),
         };
-        self.spawner.render(&spawner_config);
-        self.renderer.render(props);
+        self.spawner.render(context, &spawner_config);
+        self.renderer.render(context, props);
     }
 
-    fn ui(
+    fn ui<'c>(
         &mut self,
+        context: &Context,
         ui: &mut macroquad::ui::Ui,
-        state: &mut ItemRendererProperties<CoinProperties>,
-    ) {
+        state: &'c mut ItemRendererProperties<CoinProperties>,
+    ) -> &'c mut ItemRendererProperties<CoinProperties> {
         let mut spawner_config = SpawnerConfig {
             max_time: 1.0 / 60.,
             size: vec2(state.extra_data.coin_size, state.extra_data.coin_size),
             extra_data: state.extra_data.to_owned(),
             spawned_items: state.items.to_owned(),
         };
-        self.spawner.ui(ui, &mut spawner_config);
-        self.renderer.ui(ui, state);
+        self.spawner.ui(context, ui, &mut spawner_config);
+        self.renderer.ui(context, ui, state);
+        state
     }
 }

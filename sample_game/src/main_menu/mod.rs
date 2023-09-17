@@ -2,8 +2,9 @@ use macroquad::hash;
 use monad_quad::{
     components::{
         animation::{Tween, TweenConfig, TweenKind},
-        logic::{Comp, Never},
+        logic::Comp,
         ui::{Button, Window},
+        Context,
     },
     Component,
 };
@@ -24,7 +25,7 @@ struct Scroller {
     tweener: Tween<fn(f32, &mut f32)>,
 }
 
-impl Component<ScrollerConfig> for Scroller {
+impl Component<&ScrollerConfig, &mut ScrollerConfig> for Scroller {
     type Input = ();
 
     fn instantiate(_: Self::Input) -> Self
@@ -39,9 +40,13 @@ impl Component<ScrollerConfig> for Scroller {
         }
     }
 
-    fn process(&mut self, state: &mut ScrollerConfig) {
+    fn process<'c>(
+        &mut self,
+        context: &Context,
+        state: &'c mut ScrollerConfig,
+    ) -> &'c mut ScrollerConfig {
         match state.data {
-            SwitchingTo::None => (),
+            SwitchingTo::OnScreen(_) => (),
             SwitchingTo::Switch {
                 from,
                 to,
@@ -55,23 +60,24 @@ impl Component<ScrollerConfig> for Scroller {
                     tween_kind: state.tween_func,
                     time_in_seconds: 2.,
                 };
-                self.tweener.process(&mut config);
-                state.data = SwitchingTo::Switch {
-                    from,
-                    to,
-                    full_progress: config.tween_data,
-                    at: config.at_time,
-                };
+                self.tweener.process(context, &mut config);
+                if config.at_time >= 1. {
+                    state.data = SwitchingTo::OnScreen(to)
+                } else {
+                    state.data = SwitchingTo::Switch {
+                        from,
+                        to,
+                        full_progress: config.tween_data,
+                        at: config.at_time,
+                    };
+                }
             }
         }
+        state
     }
-
-    fn render(&self, _: &ScrollerConfig) {}
-
-    fn ui(&mut self, _: &mut macroquad::ui::Ui, _: &mut ScrollerConfig) {}
 }
 
-fn main_menu() -> impl Component<MainMenuProperties> {
+fn main_menu() -> impl for<'a> Component<&'a MainMenuProperties, &'a mut MainMenuProperties> {
     Comp::map_in(MainMenuProperties::to_top_window_state).map_out_for(
         MainMenuProperties::merge_from_top_window_state,
         Window::new(
@@ -99,12 +105,15 @@ fn main_menu() -> impl Component<MainMenuProperties> {
     )
 }
 
-pub fn main_menu2() -> impl Component<MainMenuProperties> {
+pub fn main_menu2() -> impl for<'a> Component<&'a MainMenuProperties, &'a mut MainMenuProperties> {
     (
-        main_menu_drawer::DrawScreens::instantiate((main_menu(), Never)),
+        main_menu_drawer::DrawScreens::instantiate((
+            main_menu(),
+            settings_menu::draw_settings_menu(),
+        )),
         Comp::map_in(|x: &MainMenuProperties| ScrollerConfig {
             data: x.switching.to_owned(),
-            tween_func: TweenKind::EaseInBounce,
+            tween_func: TweenKind::EaseInOutExpo,
         })
         .map_out_for(|x, y| y.switching = x.data, Scroller::instantiate(())),
     )

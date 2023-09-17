@@ -1,6 +1,6 @@
 use macroquad::{hash, prelude::Vec2};
 
-use crate::Component;
+use crate::{components::Context, Component};
 
 pub struct GroupProperties<T> {
     size: Vec2,
@@ -10,7 +10,9 @@ pub struct GroupProperties<T> {
 pub struct Group<Child> {
     child: Child,
 }
-impl<T, Child: Component<T>> Component<GroupProperties<T>> for Group<Child> {
+impl<T, Child: for<'z> Component<&'z T, &'z mut T>>
+    Component<&GroupProperties<T>, &mut GroupProperties<T>> for Group<Child>
+{
     type Input = Child;
 
     fn instantiate(input: Self::Input) -> Self
@@ -20,17 +22,30 @@ impl<T, Child: Component<T>> Component<GroupProperties<T>> for Group<Child> {
         Self { child: input }
     }
 
-    fn process(&mut self, state: &mut GroupProperties<T>) {
-        self.child.process(&mut state.extra_data)
+    fn process<'c>(
+        &mut self,
+        context: &Context,
+        state: &'c mut GroupProperties<T>,
+    ) -> &'c mut GroupProperties<T> {
+        {
+            self.child.process(context, &mut state.extra_data);
+        }
+        state
     }
 
-    fn render(&self, props: &GroupProperties<T>) {
-        self.child.render(&props.extra_data);
+    fn render(&self, context: &Context, props: &GroupProperties<T>) {
+        self.child.render(context, &props.extra_data);
     }
 
-    fn ui(&mut self, ui: &mut macroquad::ui::Ui, state: &mut GroupProperties<T>) {
+    fn ui<'c>(
+        &mut self,
+        context: &Context,
+        ui: &mut macroquad::ui::Ui,
+        state: &'c mut GroupProperties<T>,
+    ) -> &'c mut GroupProperties<T> {
         ui.group(hash!(), state.size, |ui| {
-            self.child.ui(ui, &mut state.extra_data)
+            self.child.ui(context, ui, &mut state.extra_data);
         });
+        state
     }
 }

@@ -10,3 +10,6 @@ edition = "2021"
 macroquad = { version = "0.4.1", path = "../../macroquad" }
 monad_quad = { path = "../" }
 futures = "*"
+serde = { version = "1.0.178", features = ["serde_derive"] }
+serde_json = "1.0.104"
+directories = "5.0.1"

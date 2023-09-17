@@ -1,12 +1,10 @@
 use macroquad::{
     prelude::{vec2, Color, Rect, Vec2},
     rand::RandomRange,
-    time::get_frame_time,
-    window::{screen_height, screen_width},
 };
 use monad_quad::components::{
     render::{Rectangle, RectangleProps},
-    Component,
+    Component, Context,
 };
 
 use super::{
@@ -30,7 +28,9 @@ pub struct SingleEnemyRenderer {
     child: Rectangle,
 }
 
-impl Component<ChildProperties<EnemyProperties>> for SingleEnemyRenderer {
+impl Component<&ChildProperties<EnemyProperties>, &mut ChildProperties<EnemyProperties>>
+    for SingleEnemyRenderer
+{
     type Input = ();
 
     fn instantiate(_: Self::Input) -> Self
@@ -40,8 +40,12 @@ impl Component<ChildProperties<EnemyProperties>> for SingleEnemyRenderer {
         Self { child: Rectangle }
     }
 
-    fn process(&mut self, state: &mut ChildProperties<EnemyProperties>) {
-        let frame_time = get_frame_time();
+    fn process<'c>(
+        &mut self,
+        context: &Context,
+        state: &'c mut ChildProperties<EnemyProperties>,
+    ) -> &'c mut ChildProperties<EnemyProperties> {
+        let frame_time = context.get_delta();
         let player_rec = Rect::new(
             state.extra_data.player_loc.x,
             state.extra_data.player_loc.y,
@@ -62,45 +66,65 @@ impl Component<ChildProperties<EnemyProperties>> for SingleEnemyRenderer {
             state.extra_data.reached_the_end += 1;
             state.destroyed = true;
         }
+        state
     }
 
-    fn render(&self, props: &ChildProperties<EnemyProperties>) {
-        self.child.render(&RectangleProps {
-            size: vec2(props.extra_data.enemies_size, props.extra_data.enemies_size),
-            color: props.extra_data.enemies_color,
-            location: props.location,
-        })
+    fn render(&self, context: &Context, props: &ChildProperties<EnemyProperties>) {
+        self.child.render(
+            context,
+            &RectangleProps {
+                size: vec2(props.extra_data.enemies_size, props.extra_data.enemies_size),
+                color: props.extra_data.enemies_color,
+                location: props.location,
+            },
+        )
     }
-    fn ui(&mut self, ui: &mut macroquad::ui::Ui, state: &mut ChildProperties<EnemyProperties>) {
+    fn ui<'c>(
+        &mut self,
+        context: &Context,
+        ui: &mut macroquad::ui::Ui,
+        state: &'c mut ChildProperties<EnemyProperties>,
+    ) -> &'c mut ChildProperties<EnemyProperties> {
         self.child.ui(
+            context,
             ui,
             &mut RectangleProps {
                 size: vec2(state.extra_data.enemies_size, state.extra_data.enemies_size),
                 color: state.extra_data.enemies_color,
                 location: state.location,
             },
-        )
+        );
+        state
     }
 }
 
-type EnemySpawner = Spawner<Vec2, EnemyProperties, fn(&mut SpawnerConfig<EnemyProperties, Vec2>)>;
+type EnemySpawner =
+    Spawner<Vec2, EnemyProperties, fn(&Context, &mut SpawnerConfig<EnemyProperties, Vec2>)>;
 
 pub struct Enemies {
     spawner: EnemySpawner,
     renderer: ItemRenderer<EnemyProperties, SingleEnemyRenderer>,
 }
-impl Component<ItemRendererProperties<EnemyProperties>> for Enemies {
+impl
+    Component<
+        &ItemRendererProperties<EnemyProperties>,
+        &mut ItemRendererProperties<EnemyProperties>,
+    > for Enemies
+{
     type Input = ();
 
     fn instantiate(_: Self::Input) -> Self
     where
         Self: Sized,
     {
-        fn on_reached_time(props: &mut SpawnerConfig<EnemyProperties, Vec2>) {
-            let window_height = screen_height();
+        fn on_reached_time(context: &Context, props: &mut SpawnerConfig<EnemyProperties, Vec2>) {
+            let window_height = context.viewport_size().y;
             if f32::gen_range(0., 1.) < props.extra_data.enemies_chance {
                 props.spawned_items.push(vec2(
-                    f32::gen_range(0., screen_width() + props.extra_data.enemies_size),
+                    f32::gen_range(
+                        0.,
+                        context.viewport_size().x + props.extra_data.enemies_size,
+                    ),
                     window_height, //f32::gen_range(0., screen_height() - state.coin_size),
                 ))
             }
@@ -111,41 +135,48 @@ impl Component<ItemRendererProperties<EnemyProperties>> for Enemies {
         }
     }
 
-    fn process(&mut self, state: &mut ItemRendererProperties<EnemyProperties>) {
+    fn process<'c>(
+        &mut self,
+        context: &Context,
+        state: &'c mut ItemRendererProperties<EnemyProperties>,
+    ) -> &'c mut ItemRendererProperties<EnemyProperties> {
         let mut config = SpawnerConfig {
             max_time: 1.0 / 60.,
             size: vec2(state.extra_data.enemies_size, state.extra_data.enemies_size),
             extra_data: state.extra_data.to_owned(),
             spawned_items: state.items.to_owned(),
         };
-        self.spawner.process(&mut config);
+        self.spawner.process(context, &mut config);
         state.extra_data = config.extra_data;
         state.items = config.spawned_items;
-        self.renderer.process(state);
+        self.renderer.process(context, state);
+        state
     }
 
-    fn render(&self, props: &ItemRendererProperties<EnemyProperties>) {
+    fn render(&self, context: &Context, props: &ItemRendererProperties<EnemyProperties>) {
         let config = SpawnerConfig {
             max_time: 1.0 / 60.,
             size: vec2(props.extra_data.enemies_size, props.extra_data.enemies_size),
             extra_data: props.extra_data.to_owned(),
             spawned_items: props.items.to_owned(),
         };
-        self.spawner.render(&config);
-        self.renderer.render(props);
+        self.spawner.render(context, &config);
+        self.renderer.render(context, props);
     }
-    fn ui(
+    fn ui<'c>(
         &mut self,
+        context: &Context,
         ui: &mut macroquad::ui::Ui,
-        state: &mut ItemRendererProperties<EnemyProperties>,
-    ) {
+        state: &'c mut ItemRendererProperties<EnemyProperties>,
+    ) -> &'c mut ItemRendererProperties<EnemyProperties> {
         let mut config = SpawnerConfig {
             max_time: 1.0 / 60.,
             size: vec2(state.extra_data.enemies_size, state.extra_data.enemies_size),
             extra_data: state.extra_data.to_owned(),
             spawned_items: state.items.to_owned(),
         };
-        self.spawner.ui(ui, &mut config);
-        self.renderer.ui(ui, state);
+        self.spawner.ui(context, ui, &mut config);
+        self.renderer.ui(context, ui, state);
+        state
     }
 }

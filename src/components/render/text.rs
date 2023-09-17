@@ -1,9 +1,6 @@
-use macroquad::{
-    prelude::{Color, Vec2},
-    text::draw_text,
-};
+use macroquad::prelude::{Color, Vec2};
 
-use crate::Component;
+use crate::{components::Context, Component};
 
 /// The properties needed to render text
 pub struct TextProperties {
@@ -15,17 +12,15 @@ pub struct TextProperties {
 
 /// A component to render some text
 pub struct Text;
-impl Component<TextProperties> for Text {
+impl Component<&TextProperties, &mut TextProperties> for Text {
     type Input = ();
 
     fn instantiate(_: Self::Input) -> Self {
         Self
     }
 
-    fn process(&mut self, _: &mut TextProperties) {}
-
-    fn render(&self, props: &TextProperties) {
-        draw_text(
+    fn render(&self, context: &Context, props: &TextProperties) {
+        context.draw_text(
             &props.text,
             props.location.x,
             props.location.y,
@@ -33,5 +28,4 @@ impl Component<TextProperties> for Text {
             props.color,
         )
     }
-    fn ui(&mut self, _: &mut macroquad::ui::Ui, _: &mut TextProperties) {}
 }

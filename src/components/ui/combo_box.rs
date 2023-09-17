@@ -1,14 +1,14 @@
 use macroquad::hash;
 
-use crate::Component;
+use crate::{components::Context, Component};
 
 pub struct ComboBoxProperties {
-    label: String,
-    variants: Vec<String>,
-    chosen: Option<usize>,
+    pub label: String,
+    pub variants: Vec<String>,
+    pub chosen: Option<usize>,
 }
 pub struct ComboBox;
-impl Component<ComboBoxProperties> for ComboBox {
+impl Component<&ComboBoxProperties, &mut ComboBoxProperties> for ComboBox {
     type Input = ();
 
     fn instantiate(_: Self::Input) -> Self
@@ -18,16 +18,18 @@ impl Component<ComboBoxProperties> for ComboBox {
         Self
     }
 
-    fn process(&mut self, _: &mut ComboBoxProperties) {}
-
-    fn render(&self, _: &ComboBoxProperties) {}
-
-    fn ui(&mut self, ui: &mut macroquad::ui::Ui, state: &mut ComboBoxProperties) {
+    fn ui<'c>(
+        &mut self,
+        _: &Context,
+        ui: &mut macroquad::ui::Ui,
+        state: &'c mut ComboBoxProperties,
+    ) -> &'c mut ComboBoxProperties {
         let x = state
             .variants
             .iter()
             .map(String::as_ref)
             .collect::<Vec<_>>();
         ui.combo_box(hash!(), &state.label, &x, &mut state.chosen);
+        state
     }
 }

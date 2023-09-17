@@ -1,3 +1,10 @@
+use macroquad::{
+    prelude::{vec2, Vec2},
+    window::screen_width,
+};
+
+use crate::settings::Settings;
+
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum OnScreen {
     MainMenu,
@@ -6,7 +13,7 @@ pub enum OnScreen {
 
 #[derive(Clone, Debug)]
 pub enum SwitchingTo {
-    None,
+    OnScreen(OnScreen),
     Switch {
         from: OnScreen,
         to: OnScreen,
@@ -29,6 +36,15 @@ impl SwitchingTo {
             _ => None,
         }
     }
+    pub fn get_location_of_window(&self, from: OnScreen) -> Vec2 {
+        let progress = self.get_progress_from(from).unwrap_or(0.);
+        let loc = if progress.is_sign_negative() {
+            screen_width() - ((-progress) * screen_width())
+        } else {
+            progress * screen_width()
+        };
+        vec2(loc, 0.)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -42,15 +58,15 @@ pub struct MainMenuProperties {
     pub started_game: bool,
     pub switching: SwitchingTo,
     pub selected_button: Option<MainMenuButtonSelected>,
-    pub on_screen: OnScreen,
+    pub settings: Settings,
 }
 impl MainMenuProperties {
     pub fn new() -> Self {
         Self {
             started_game: false,
-            switching: SwitchingTo::None,
+            switching: SwitchingTo::OnScreen(OnScreen::MainMenu),
             selected_button: None,
-            on_screen: OnScreen::MainMenu,
+            settings: Default::default(),
         }
     }
 }

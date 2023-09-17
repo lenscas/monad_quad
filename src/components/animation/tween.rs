@@ -1,4 +1,4 @@
-use crate::Component;
+use crate::{components::Context, Component};
 
 use super::animate_state::AnimateState;
 
@@ -218,7 +218,7 @@ pub struct Tween<Func> {
     func: Func,
 }
 
-impl<T, Func: Fn(f32, &mut T)> Component<TweenConfig<T>> for Tween<Func> {
+impl<T, Func: Fn(f32, &mut T)> Component<&TweenConfig<T>, &mut TweenConfig<T>> for Tween<Func> {
     type Input = Func;
 
     fn instantiate(input: Self::Input) -> Self
@@ -234,20 +234,21 @@ impl<T, Func: Fn(f32, &mut T)> Component<TweenConfig<T>> for Tween<Func> {
         }
     }
 
-    fn process(&mut self, state: &mut TweenConfig<T>) {
+    fn process<'c>(
+        &mut self,
+        context: &Context,
+        state: &'c mut TweenConfig<T>,
+    ) -> &'c mut TweenConfig<T> {
         if state.run && state.at_time < 1. {
             let mut config = AnimateData {
                 max_seconds: state.time_in_seconds,
                 at: state.at_time,
             };
-            self.child.process(&mut config);
+            self.child.process(context, &mut config);
             state.at_time = config.at;
             let at = state.tween_kind.process(state.at_time);
             (self.func)(at, &mut state.tween_data);
         }
+        state
     }
-
-    fn render(&self, _: &TweenConfig<T>) {}
-
-    fn ui(&mut self, _: &mut macroquad::ui::Ui, _: &mut TweenConfig<T>) {}
 }
