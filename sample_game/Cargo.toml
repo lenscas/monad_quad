@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 
-macroquad = { version = "0.4.1", path = "../../macroquad" }
+macroquad = { version = "0.4.1" }
 monad_quad = { path = "../" }
 futures = "*"
 serde = { version = "1.0.178", features = ["serde_derive"] }

@@ -4,5 +4,6 @@
     "./Cargo.toml",
     "./Cargo.toml"
   ],
-  "cSpell.words": ["macroquad"]
+  "cSpell.words": ["macroquad"],
+  "rust-analyzer.cargo.features": ["macroquad-tiled"]
 }

@@ -9,4 +9,5 @@ members = ["sample_game"]
 
 [dependencies]
 futures = "0.3.28"
-macroquad = { version = "0.4.1", path = "../macroquad" }
+macroquad = { version = "0.4.1" }
+macroquad-tiled = { version = "*", optional = true }

@@ -5,6 +5,8 @@ pub mod data;
 pub mod events;
 pub mod logic;
 pub mod render;
+#[cfg(feature = "macroquad-tiled")]
+pub mod tiled;
 pub mod ui;
 
 pub use context::Context;

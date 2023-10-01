@@ -264,6 +264,8 @@ checksum = "b4668fb0ea861c1df094127ac5f1da3409a82116a4ba74fca2e58ef927159bb3"
 [[package]]
 name = "macroquad"
 version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a0bf249d79f5080e200334fe30ffca25582d682ee2e180768ad7f121ba9f8caa"
 dependencies = [
  "bumpalo",
  "fontdue",
@@ -276,8 +278,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "macroquad-tiled"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9119b056e57e2b3d16183cefb20a0f79f56b0805f6e18b724a66ad03fae11275"
+dependencies = [
+ "macroquad",
+ "nanoserde",
+]
+
+[[package]]
 name = "macroquad_macro"
 version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5cecfede1e530599c8686f7f2d609489101d3d63741a6dc423afc997ce3fcc8"
 
 [[package]]
 name = "malloc_buf"
@@ -322,7 +336,23 @@ version = "0.1.0"
 dependencies = [
  "futures",
  "macroquad",
+ "macroquad-tiled",
 ]
+
+[[package]]
+name = "nanoserde"
+version = "0.1.35"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4a983d0b19ed0fcd803c4f04f9b20d5e6dd17e06d44d98742a0985ac45dab1bc"
+dependencies = [
+ "nanoserde-derive",
+]
+
+[[package]]
+name = "nanoserde-derive"
+version = "0.1.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4dc96541767a4279572fdcf9f95af9cc1c9b2a2254e7a079203c81e206a9059"
 
 [[package]]
 name = "ndk-sys"
